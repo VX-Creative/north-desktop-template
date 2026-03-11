@@ -62,14 +62,15 @@ if errorlevel 1 (
 rem Atualiza os artefatos principais antes de continuar a criacao do projeto.
 if exist "%_updateRepo%\NorthDesktop.Template.zip" copy /y "%_updateRepo%\NorthDesktop.Template.zip" "%~dp0" >nul
 if exist "%_updateRepo%\README.md" copy /y "%_updateRepo%\README.md" "%~dp0" >nul
+if exist "%~dp0New-Project.latest.bat" del /f /q "%~dp0New-Project.latest.bat" >nul 2>nul
 if exist "%_updateRepo%\New-Project.bat" copy /y "%_updateRepo%\New-Project.bat" "%~dp0New-Project.latest.bat" >nul
+
+if exist "%~dp0New-Project.latest.bat" (
+    move /y "%~dp0New-Project.latest.bat" "%~dp0New-Project.bat" >nul
+)
 
 if exist "%_updateRoot%" rmdir /s /q "%_updateRoot%"
 echo Template atualizado com sucesso.
-if exist "%~dp0New-Project.latest.bat" (
-    echo Foi encontrada uma versao mais nova do launcher.
-    echo Na proxima execucao, renomeie New-Project.latest.bat para New-Project.bat se quiser usar o launcher atualizado.
-)
 goto :eof
 
 # POWERSHELL_PAYLOAD_BEGIN
