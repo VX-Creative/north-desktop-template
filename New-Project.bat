@@ -7,13 +7,15 @@ rem Tenta atualizar os artefatos locais sem bloquear o uso offline.
 call :TryGitPull
 
 set "_payload=%temp%\NorthDesktop.NewProject.%random%%random%.ps1"
-for /f "tokens=1 delims=:" %%A in ('findstr /n /c:"# POWERSHELL_PAYLOAD_BEGIN" "%~f0"') do set /a "_startLine=%%A+1"
+set "NORTH_TEMPLATE_ROOT=%~dp0"
+for /f "tokens=1 delims=:" %%A in ('findstr /n /c:"# POWERSHELL_PAYLOAD_BEGIN" "%~f0"') do set "_startLine=%%A"
 more +%_startLine% "%~f0" > "%_payload%"
 
 powershell -NoProfile -ExecutionPolicy Bypass -File "%_payload%" %*
 set "_exitCode=%errorlevel%"
 
 del /f /q "%_payload%" >nul 2>nul
+if not "%_exitCode%"=="0" pause
 exit /b %_exitCode%
 
 :TryGitPull
@@ -65,10 +67,11 @@ function Convert-ToNamespace {
     return ($cleanSegments -join '.')
 }
 
-$packageZipPath = Join-Path $PSScriptRoot "NorthDesktop.Template.zip"
+$templateRoot = $env:NORTH_TEMPLATE_ROOT
+$packageZipPath = Join-Path $templateRoot "NorthDesktop.Template.zip"
 
 if (-not (Test-Path $packageZipPath)) {
-    Write-Error "O arquivo NorthDesktop.Template.zip não foi encontrado."
+    Write-Error "O arquivo NorthDesktop.Template.zip n??o foi encontrado."
     exit 1
 }
 
@@ -86,7 +89,7 @@ if ([string]::IsNullOrWhiteSpace($DestinationPath)) {
 }
 
 if ([string]::IsNullOrWhiteSpace($DestinationPath)) {
-    $DestinationPath = $PSScriptRoot
+    $DestinationPath = $templateRoot
 }
 
 [Console]::Title = "North Desktop Template"
