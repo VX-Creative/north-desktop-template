@@ -2,6 +2,8 @@
 setlocal
 title North Desktop Template
 color 0F
+set "TEMPLATE_REPO_URL=https://github.com/VX-Creative/north-desktop-template.git"
+set "TEMPLATE_REPO_BRANCH=template"
 
 rem Tenta atualizar os artefatos locais sem bloquear o uso offline.
 call :TryGitPull
@@ -25,17 +27,48 @@ if errorlevel 1 (
     goto :eof
 )
 
-if not exist "%~dp0\.git" (
-    echo Pasta sem Git. Seguindo com os arquivos locais...
+echo Verificando atualizacoes do template...
+git -C "%~dp0" rev-parse --is-inside-work-tree >nul 2>nul
+if not errorlevel 1 (
+    rem Atualiza pelo reposit??rio oficial quando o template foi clonado via Git.
+    git -C "%~dp0" pull --ff-only "%TEMPLATE_REPO_URL%" "%TEMPLATE_REPO_BRANCH%"
+    if errorlevel 1 (
+        echo Nao foi possivel atualizar via git pull. Tentando baixar a versao mais recente...
+        call :RefreshFromClone
+    ) else (
+        echo Template atualizado com sucesso.
+    )
     goto :eof
 )
 
-echo Verificando atualizacoes do template...
-git -C "%~dp0" pull --ff-only >nul 2>nul
+rem Atualiza por clone temporario quando os arquivos foram copiados sem o .git.
+call :RefreshFromClone
+goto :eof
+
+:RefreshFromClone
+set "_updateRoot=%temp%\NorthDesktop.Template.Update.%random%%random%"
+set "_updateRepo=%_updateRoot%\repo"
+
+if exist "%_updateRoot%" rmdir /s /q "%_updateRoot%"
+mkdir "%_updateRoot%" >nul 2>nul
+
+git clone --depth 1 --single-branch --branch "%TEMPLATE_REPO_BRANCH%" "%TEMPLATE_REPO_URL%" "%_updateRepo%"
 if errorlevel 1 (
     echo Nao foi possivel atualizar agora. Seguindo com a versao local...
-) else (
-    echo Template atualizado com sucesso.
+    if exist "%_updateRoot%" rmdir /s /q "%_updateRoot%"
+    goto :eof
+)
+
+rem Atualiza os artefatos principais antes de continuar a criacao do projeto.
+if exist "%_updateRepo%\NorthDesktop.Template.zip" copy /y "%_updateRepo%\NorthDesktop.Template.zip" "%~dp0" >nul
+if exist "%_updateRepo%\README.md" copy /y "%_updateRepo%\README.md" "%~dp0" >nul
+if exist "%_updateRepo%\New-Project.bat" copy /y "%_updateRepo%\New-Project.bat" "%~dp0New-Project.latest.bat" >nul
+
+if exist "%_updateRoot%" rmdir /s /q "%_updateRoot%"
+echo Template atualizado com sucesso.
+if exist "%~dp0New-Project.latest.bat" (
+    echo Foi encontrada uma versao mais nova do launcher.
+    echo Na proxima execucao, renomeie New-Project.latest.bat para New-Project.bat se quiser usar o launcher atualizado.
 )
 goto :eof
 
