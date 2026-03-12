@@ -4,9 +4,12 @@ title North Desktop Template
 color 0F
 set "TEMPLATE_REPO_URL=https://github.com/VX-Creative/north-desktop-template.git"
 set "TEMPLATE_REPO_BRANCH=template"
+set "NUGET_SOURCE_NAME=VX-Creative-GitHub"
+set "NUGET_SOURCE_URL=https://nuget.pkg.github.com/VX-Creative/index.json"
 
 rem Tenta atualizar os artefatos locais sem bloquear o uso offline.
 call :TryGitPull
+call :ConfigureNuGetSource
 
 set "_payload=%temp%\NorthDesktop.NewProject.%random%%random%.ps1"
 set "NORTH_TEMPLATE_ROOT=%~dp0"
@@ -30,8 +33,8 @@ if errorlevel 1 (
 echo Verificando atualizacoes do template...
 git -C "%~dp0" rev-parse --is-inside-work-tree >nul 2>nul
 if not errorlevel 1 (
-    rem Atualiza pelo reposit??rio oficial quando o template foi clonado via Git.
-    git -C "%~dp0" pull --ff-only "%TEMPLATE_REPO_URL%" "%TEMPLATE_REPO_BRANCH%"
+    rem Atualiza pelo repositorio oficial quando o template foi clonado via Git.
+    git -C "%~dp0" pull --ff-only "%TEMPLATE_REPO_URL%" "%TEMPLATE_REPO_BRANCH%" >nul 2>nul
     if errorlevel 1 (
         echo Nao foi possivel atualizar via git pull. Tentando baixar a versao mais recente...
         call :RefreshFromClone
@@ -52,7 +55,7 @@ set "_updateRepo=%_updateRoot%\repo"
 if exist "%_updateRoot%" rmdir /s /q "%_updateRoot%"
 mkdir "%_updateRoot%" >nul 2>nul
 
-git clone --depth 1 --single-branch --branch "%TEMPLATE_REPO_BRANCH%" "%TEMPLATE_REPO_URL%" "%_updateRepo%"
+git clone --depth 1 --single-branch --branch "%TEMPLATE_REPO_BRANCH%" "%TEMPLATE_REPO_URL%" "%_updateRepo%" >nul 2>nul
 if errorlevel 1 (
     echo Nao foi possivel atualizar agora. Seguindo com a versao local...
     if exist "%_updateRoot%" rmdir /s /q "%_updateRoot%"
@@ -62,15 +65,40 @@ if errorlevel 1 (
 rem Atualiza os artefatos principais antes de continuar a criacao do projeto.
 if exist "%_updateRepo%\NorthDesktop.Template.zip" copy /y "%_updateRepo%\NorthDesktop.Template.zip" "%~dp0" >nul
 if exist "%_updateRepo%\README.md" copy /y "%_updateRepo%\README.md" "%~dp0" >nul
-if exist "%~dp0New-Project.latest.bat" del /f /q "%~dp0New-Project.latest.bat" >nul 2>nul
-if exist "%_updateRepo%\New-Project.bat" copy /y "%_updateRepo%\New-Project.bat" "%~dp0New-Project.latest.bat" >nul
-
-if exist "%~dp0New-Project.latest.bat" (
-    move /y "%~dp0New-Project.latest.bat" "%~dp0New-Project.bat" >nul
-)
 
 if exist "%_updateRoot%" rmdir /s /q "%_updateRoot%"
 echo Template atualizado com sucesso.
+goto :eof
+
+:ConfigureNuGetSource
+where dotnet >nul 2>nul
+if errorlevel 1 (
+    echo .NET SDK nao encontrado. Pulando configuracao da source do pacote...
+    goto :eof
+)
+
+dotnet nuget list source | findstr /i /c:"%NUGET_SOURCE_NAME%" >nul 2>nul
+if not errorlevel 1 (
+    echo Source de update ja configurada.
+    goto :eof
+)
+
+if "%NORTHDESKTOP_GITHUB_USERNAME%"=="" (
+    echo Source de update nao configurada. Defina NORTHDESKTOP_GITHUB_USERNAME e NORTHDESKTOP_GITHUB_TOKEN para habilitar updates pelo pacote.
+    goto :eof
+)
+
+if "%NORTHDESKTOP_GITHUB_TOKEN%"=="" (
+    echo Source de update nao configurada. Defina NORTHDESKTOP_GITHUB_USERNAME e NORTHDESKTOP_GITHUB_TOKEN para habilitar updates pelo pacote.
+    goto :eof
+)
+
+dotnet nuget add source "%NUGET_SOURCE_URL%" --name "%NUGET_SOURCE_NAME%" --username "%NORTHDESKTOP_GITHUB_USERNAME%" --password "%NORTHDESKTOP_GITHUB_TOKEN%" --store-password-in-clear-text >nul
+if errorlevel 1 (
+    echo Nao foi possivel configurar a source do pacote agora.
+) else (
+    echo Source de update configurada com sucesso.
+)
 goto :eof
 
 # POWERSHELL_PAYLOAD_BEGIN
@@ -105,7 +133,7 @@ $templateRoot = $env:NORTH_TEMPLATE_ROOT
 $packageZipPath = Join-Path $templateRoot "NorthDesktop.Template.zip"
 
 if (-not (Test-Path $packageZipPath)) {
-    Write-Error "O arquivo NorthDesktop.Template.zip n??o foi encontrado."
+    Write-Error "O arquivo NorthDesktop.Template.zip nao foi encontrado."
     exit 1
 }
 
@@ -257,5 +285,4 @@ Write-Host "1. Abrir o arquivo $ProjectName.slnx"
 Write-Host "2. Compilar o projeto"
 Write-Host "3. Comecar o desenvolvimento"
 
-# Abre a pasta final pronta para o dev localizar a solution.
 Start-Process explorer.exe $targetRootPath | Out-Null
